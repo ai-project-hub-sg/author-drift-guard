@@ -1,4 +1,4 @@
-# author-drift-guard 安装脚本
+﻿# author-drift-guard 安装脚本
 # 用法:
 #   .\install.ps1                  # 仅挂载技能到各 agent 技能库（junction，免复制）
 #   .\install.ps1 -Repo <path>     # 同时把 pre-push 钩子装入该仓库（硬链接优先，回退复制）
