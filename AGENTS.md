@@ -1,8 +1,13 @@
 # author-drift-guard
 
 > ⚠️ **贡献者身份约定**（Author Identity Policy）
-> 记录于 2026-11-22。
-> 约定：每次单独询问
+> 记录于 2026-11-22，触发场景：首次 push origin main，检出名单外作者并已统一为当前身份。
+> 约定：push 前必须统一作者
+> 修改约定请直接编辑本行。
+
+> ⚠️ **AI 署名约定**（AI Signature Policy）
+> 记录于 2026-11-22，触发场景：首次 push origin main，检出署名并已剥离。
+> 约定：push 前必须剥离署名
 > 修改约定请直接编辑本行。
 
 ## 项目说明
