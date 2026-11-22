@@ -24,8 +24,8 @@ done
 policy=''
 allow=''
 if [ -f AGENTS.md ]; then
-    policy=$(grep -A6 '身份约定' AGENTS.md | grep -oE '约定：[^。]*' | head -1)
-    allow=$(grep -oE '允许身份：.*' AGENTS.md | sed 's/^允许身份：//;s/。.*//;s/[[:space:]]*$//')
+    policy=$(grep -A6 '身份约定' AGENTS.md | grep -oE '约定：.*' | head -1 | sed -e 's/^约定：//' -e 's/。.*//' -e 's/#.*//' -e 's/[[:space:]]*$//')
+    allow=$(grep -oE '允许身份：.*' AGENTS.md | sed -e 's/^允许身份：//' -e 's/。.*//' -e 's/#.*//' -e 's/[[:space:]]*$//')
 fi
 case "$policy" in
     *允许任意贡献者*|*允许多贡献者*) exit 0 ;;           # 约定放行
