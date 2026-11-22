@@ -1,0 +1,73 @@
+#!/bin/sh
+# author-drift-guard :: git pre-push 钩子
+# 拦截「名单外作者身份」的提交被 push 到远端；放行依据=仓库根 AGENTS.md 顶部「贡献者身份约定」块。
+# 合法身份 = 当前 git config user.name/user.email + AGENTS.md 每行「允许身份：…」。
+# 安装：install.ps1 -Repo <path> 或 install.sh -r <path>（硬链接/复制到 .git/hooks/pre-push）
+
+remote="$1"
+url="$2"
+zero='0000000000000000000000000000000000000000'
+
+# ---- 收集本次 push 的提交范围 -------------------------------------------
+ranges=''
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue            # 删除 ref，无需检查
+    if [ "$remote_sha" = "$zero" ]; then
+        ranges="$ranges $local_sha"                    # 新 ref：该 ref 全部历史
+    else
+        ranges="$ranges $remote_sha..$local_sha"       # 增量范围
+    fi
+done
+[ -z "$ranges" ] && exit 0
+
+# ---- 读取 AGENTS.md 约定 --------------------------------------------------
+policy=''
+allow=''
+if [ -f AGENTS.md ]; then
+    policy=$(grep -A6 '身份约定' AGENTS.md | grep -oE '约定：[^。]*' | head -1)
+    allow=$(grep -oE '允许身份：.*' AGENTS.md | sed 's/^允许身份：//;s/。.*//;s/[[:space:]]*$//')
+fi
+case "$policy" in
+    *允许任意贡献者*|*允许多贡献者*) exit 0 ;;           # 约定放行
+esac
+
+# ---- 收集本次 push 的去重作者列表（只看 author，不查 committer）-------------
+expected="$(git config user.name) <$(git config user.email)>"
+unexpected=$(
+    git log $ranges --format='%an <%ae>' 2>/dev/null | sort -u | while IFS= read -r a; do
+        [ -z "$a" ] && continue
+        [ "$a" = "$expected" ] && continue
+        email=$(printf '%s' "$a" | sed -n 's/.*<\(.*\)>.*/\1/p')
+        printf '%s\n' "$allow" | grep -qxF "$a" && continue          # 允许身份整串命中
+        [ -n "$email" ] && printf '%s\n' "$allow" | grep -qxF "$email" && continue  # 只写邮箱也认
+        printf '%s\n' "$a"
+    done
+)
+[ -z "$unexpected" ] && exit 0
+n_ids=$(printf '%s\n' "$unexpected" | grep -c .)
+
+# ---- 处置 -----------------------------------------------------------------
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+echo "pre-push 拦截: 本次 push 检出 ${n_ids} 个名单外作者身份" >&2
+printf '%s\n' "$unexpected" | while IFS= read -r a; do
+    c=$(git log $ranges --format='%an <%ae>' 2>/dev/null | grep -cFx "$a")
+    printf '  %s — %s 个提交\n' "$a" "$c" >&2
+done
+echo "期望身份: $expected（另见 AGENTS.md「允许身份」名单）" >&2
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+
+case "$policy" in
+    *统一*|*禁止*)
+        echo "AGENTS.md 约定要求统一作者身份。请先改写历史统一作者，或在「允许身份」中登记该身份。" >&2
+        exit 1
+        ;;
+esac
+
+# 无约定 / 每次单独询问 → 交互确认（无 tty 则保守拦截）
+if { true < /dev/tty; } 2>/dev/null; then
+    printf '输入 yes 放行本次 push（并请随后在 AGENTS.md 记录约定/允许身份），其他任意键取消: ' > /dev/tty
+    read -r ans < /dev/tty
+    [ "$ans" = "yes" ] && exit 0
+fi
+echo "已取消。处理方式: ① AGENTS.md 写入「约定：允许任意贡献者推送」或添加「允许身份：name <email>」 ② 统一改写作者后重推" >&2
+exit 1
